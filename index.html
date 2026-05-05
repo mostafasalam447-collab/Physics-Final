@@ -179,7 +179,7 @@ const ORDER=['l1','l2','l3','p2','p3','bk'];
 
 const ALL=[
 {n:1,cat:'l1',q:"Is an artificially made substitute for a limb lost through a congenital defect:",opts:["Artificial limb","Knee","Socket","Elbow"],c:0,exp:"Artificial limb = الطرف الاصطناعي الذي يستبدل الطرف المفقود بسبب عيب خلقي."},
-{n:2,cat:'l1',q:"Type of prosthesis designed to be purely cosmetic and highly functional:",opts:["Artificial elbow","Artificial legs","Artificial hand","No answer"],c:2,exp:"Artificial hand = اليد الاصطناعية مصممة لتكون تجميلية ووظيفية في آنٍ واحد."},
+{n:2,cat:'l1',q:"Type of prosthesis designed to be purely cosmetic and highly functional:",opts:["Artificial elbow","Artificial legs","Artificial hand","No answer"],c:1,exp:"Artificial legs = الأرجل الاصطناعية مصممة لتكون تجميلية ووظيفية في آنٍ واحد."},
 {n:3,cat:'l1',q:"How many types of prosthesis are there?",opts:["3","6","4","5"],c:2,exp:"There are 4 types of prosthesis."},
 {n:4,cat:'l1',q:"Types of prosthesis are:",opts:["Below & above the knee","Below & above the elbow","No answer","All of the above"],c:3,exp:"أنواع الأطراف الاصطناعية: ما دون/فوق الركبة وما دون/فوق الكوع."},
 {n:5,cat:'l1',q:"Prosthesis's Parts:",opts:["The prosthetic limb itself & the socket","The attachment mechanism","The control system modulus","All of the above"],c:3,exp:"أجزاء الطرف الاصطناعي = الطرف+المقبس + آلية التثبيت + نظام التحكم."},
@@ -320,48 +320,75 @@ function selCat(cat,btn){
 }
 function startQuiz(){
   questions=curCat==='all'?[...ALL]:ALL.filter(q=>q.cat===curCat);
-  answered=0;score=0;wrong=0;
+  answered=0;score=0;wrong=0;tfQuestions=[];totalQ=0;
   document.getElementById('startScreen').style.display='none';
   document.getElementById('resultsBox').style.display='none';
   document.getElementById('quizWrapper').style.display='block';
   document.getElementById('stickyBar').style.display='block';
-  updateSticky();renderCards();
+  renderCards();
 }
 function mkHdr(txt){
   const d=document.createElement('div');d.className='sec-hdr';
   d.innerHTML='<div class="line"></div><div class="lbl">'+txt+'</div><div class="line r"></div>';
   return d;
 }
-function mkTF(cat){
-  const d=TF[cat];if(!d)return null;
-  const rows=d.rows.map(r=>'<tr><td>'+r.s+'</td><td class="'+(r.a?'tt':'ff')+'">'+(r.a?'✅ T':'❌ F')+'</td></tr>').join('');
-  const w=document.createElement('div');w.className='tf-wrap';
-  w.innerHTML='<div class="tf-card"><div class="tf-hdr"><span>Q.2) True / False — [5 Marks]</span><span>'+d.title+'</span></div><table class="tf"><tbody>'+rows+'</tbody></table></div>';
-  return w;
+// tfQuestions holds all T/F items as interactive questions
+let tfQuestions=[], totalQ=0;
+
+function buildTFQuestions(cats){
+  tfQuestions=[];
+  cats.forEach(cat=>{
+    const d=TF[cat];if(!d)return;
+    d.rows.forEach((r,ri)=>{
+      tfQuestions.push({cat:cat,catTitle:d.title,idx:ri,stmt:r.s,ans:r.a});
+    });
+  });
 }
+
 function renderCards(){
   const c=document.getElementById('cardsContainer');c.innerHTML='';
   const cats=curCat==='all'?ORDER:[curCat];
-  let gi=0;
+  buildTFQuestions(cats);
+  totalQ=questions.length+tfQuestions.length;
+  answered=0;score=0;wrong=0;
+  let gi=0, tfi=0;
   cats.forEach(cat=>{
     const cqs=questions.filter(q=>q.cat===cat);
     if(!cqs.length)return;
-    c.appendChild(mkHdr(CATS[cat]));
+    // Section header
+    c.appendChild(mkHdr(CATS[cat]+' — Q.1 Choose Correct Answer'));
+    // MCQ cards
     cqs.forEach(q=>{
       const i=gi++;
       const card=document.createElement('div');
-      card.className='q-card';card.id='card-'+i;
+      card.className='q-card';card.id='card-mcq-'+i;
       card.style.animationDelay=Math.min(i*.018,.5)+'s';
-      const oh=q.opts.map((o,li)=>'<button class="opt" data-orig="'+li+'" data-letter="'+L[li]+'" onclick="checkAns('+i+','+li+','+q.c+')">'+o+'</button>').join('');
-      card.innerHTML='<div class="q-header"><div class="q-num">Q'+q.n+'</div><div class="cat-tag">'+CATS[q.cat]+'</div></div><div class="q-text">'+q.q+'</div><div class="opts" id="opts-'+i+'">'+oh+'</div><div class="q-feedback" id="fb-'+i+'"></div>';
+      const oh=q.opts.map((o,li)=>'<button class="opt" data-orig="'+li+'" data-letter="'+L[li]+'" onclick="checkMCQ('+i+','+li+','+q.c+')">'+o+'</button>').join('');
+      card.innerHTML='<div class="q-header"><div class="q-num">Q'+q.n+'</div><div class="cat-tag">'+CATS[q.cat]+'</div></div><div class="q-text">'+q.q+'</div><div class="opts" id="opts-mcq-'+i+'">'+oh+'</div><div class="q-feedback" id="fb-mcq-'+i+'"></div>';
       c.appendChild(card);
     });
-    const tf=mkTF(cat);if(tf)c.appendChild(tf);
+    // T/F section header
+    const tfCatItems=tfQuestions.filter(t=>t.cat===cat);
+    if(tfCatItems.length){
+      c.appendChild(mkHdr(CATS[cat]+' — Q.2 True / False'));
+      tfCatItems.forEach(t=>{
+        const ti=tfi++;
+        const card=document.createElement('div');
+        card.className='q-card';card.id='card-tf-'+ti;
+        card.style.animationDelay=Math.min((gi+ti)*.018,.5)+'s';
+        const oh='<button class="opt" data-orig="1" data-letter="T" onclick="checkTF('+ti+',true,'+t.ans+')">True</button>'
+                +'<button class="opt" data-orig="0" data-letter="F" onclick="checkTF('+ti+',false,'+t.ans+')">False</button>';
+        card.innerHTML='<div class="q-header"><div class="q-num">TF'+(ti+1)+'</div><div class="cat-tag">'+t.catTitle+'</div></div><div class="q-text">'+t.stmt+'</div><div class="opts" id="opts-tf-'+ti+'">'+oh+'</div><div class="q-feedback" id="fb-tf-'+ti+'"></div>';
+        c.appendChild(card);
+      });
+    }
   });
+  updateSticky();
   document.getElementById('submitBtn').disabled=true;
 }
-function checkAns(qi,chosen,correct){
-  const od=document.getElementById('opts-'+qi);
+
+function checkMCQ(qi,chosen,correct){
+  const od=document.getElementById('opts-mcq-'+qi);
   if(od.querySelector('.correct,.wrong'))return;
   const ok=chosen===correct;
   Array.from(od.querySelectorAll('.opt')).forEach(b=>{
@@ -369,27 +396,52 @@ function checkAns(qi,chosen,correct){
     if(+b.dataset.orig===correct)b.classList.add('correct');
     else if(+b.dataset.orig===chosen&&!ok)b.classList.add('wrong');
   });
-  const fb=document.getElementById('fb-'+qi);
+  const fb=document.getElementById('fb-mcq-'+qi);
   fb.style.display='block';fb.className='q-feedback '+(ok?'correct':'wrong');
   fb.textContent=(ok?'✅ Correct! ':'❌ Wrong. ')+questions[qi].exp;
-  document.getElementById('card-'+qi).classList.add(ok?'answered-correct':'answered-wrong');
+  document.getElementById('card-mcq-'+qi).classList.add(ok?'answered-correct':'answered-wrong');
   if(ok)score++;else wrong++;
   answered++;updateSticky();
-  if(answered===questions.length){
+  checkDone();
+}
+
+function checkTF(ti,chosen,correct){
+  const od=document.getElementById('opts-tf-'+ti);
+  if(od.querySelector('.correct,.wrong'))return;
+  const ok=chosen===correct;
+  Array.from(od.querySelectorAll('.opt')).forEach(b=>{
+    b.disabled=true;
+    const bVal=b.dataset.orig==='1';
+    if(bVal===correct)b.classList.add('correct');
+    else if(bVal===chosen&&!ok)b.classList.add('wrong');
+  });
+  const fb=document.getElementById('fb-tf-'+ti);
+  fb.style.display='block';fb.className='q-feedback '+(ok?'correct':'wrong');
+  fb.textContent=ok?'✅ Correct!':'❌ Wrong. الإجابة الصحيحة: '+(correct?'True ✅':'False ❌');
+  document.getElementById('card-tf-'+ti).classList.add(ok?'answered-correct':'answered-wrong');
+  if(ok)score++;else wrong++;
+  answered++;updateSticky();
+  checkDone();
+}
+
+function checkDone(){
+  if(answered===totalQ){
     document.getElementById('submitBtn').disabled=false;
     setTimeout(()=>document.getElementById('submitBtn').scrollIntoView({behavior:'smooth',block:'center'}),400);
   }
 }
+
 function updateSticky(){
-  const t=questions.length,pct=answered>0?Math.round(score/answered*100):0;
+  const t=totalQ||questions.length,pct=answered>0?Math.round(score/answered*100):0;
   document.getElementById('sNum').textContent=answered+'/'+t+' أجبت';
   document.getElementById('sC').textContent='✅ '+score;
   document.getElementById('sW').textContent='❌ '+wrong;
   document.getElementById('sP').textContent='📊 '+pct+'%';
   document.getElementById('sFill').style.width=(t>0?Math.round(answered/t*100):0)+'%';
 }
+
 function showResults(){
-  const t=questions.length,pct=Math.round(score/t*100);
+  const t=totalQ,pct=Math.round(score/t*100);
   document.getElementById('rScore').textContent=score;
   document.getElementById('rTotal').textContent=t;
   document.getElementById('rC').textContent=score;
@@ -399,11 +451,20 @@ function showResults(){
   document.getElementById('rMsg').textContent=pct>=90?'🌟 Excellent! أنت متقن!':pct>=75?'👏 Very Good! مجهود رائع!':pct>=60?'👍 Good! راجع الغلط!':'📚 تحتاج مراجعة — إنت قادر!';
   const rev=document.getElementById('reviewDiv');rev.innerHTML='<h3>📋 مراجعة الإجابات الغلط</h3>';
   let hw=false;
+  // MCQ wrong
   questions.forEach((q,i)=>{
-    const card=document.getElementById('card-'+i);
+    const card=document.getElementById('card-mcq-'+i);
     if(card&&card.classList.contains('answered-wrong')){
       hw=true;
       rev.innerHTML+='<div class="rev-item wrong"><div class="rt">❌ Q'+q.n+': '+q.q+'</div><div>✅ الإجابة الصحيحة: <strong>'+q.opts[q.c]+'</strong></div><div class="exp">'+q.exp+'</div></div>';
+    }
+  });
+  // TF wrong
+  tfQuestions.forEach((t,ti)=>{
+    const card=document.getElementById('card-tf-'+ti);
+    if(card&&card.classList.contains('answered-wrong')){
+      hw=true;
+      rev.innerHTML+='<div class="rev-item wrong"><div class="rt">❌ T/F: '+t.stmt+'</div><div>✅ الإجابة الصحيحة: <strong>'+(t.ans?'True ✅':'False ❌')+'</strong></div></div>';
     }
   });
   if(!hw)rev.innerHTML='<p style="color:#10b981;text-align:center;padding:24px;font-size:1.1em;">🎉 كل إجاباتك صح! ممتاز!</p>';
@@ -416,7 +477,7 @@ function goHome(){
   document.getElementById('startScreen').style.display='block';
   window.scrollTo({top:0,behavior:'smooth'});
 }
-window.onload=()=>{document.getElementById('qCount').textContent=ALL.length;};
+window.onload=()=>{let tfTotal=0;ORDER.forEach(cat=>{if(TF[cat])tfTotal+=TF[cat].rows.length;});document.getElementById('qCount').textContent=ALL.length+' MCQ + '+tfTotal+' T/F';};
 </script>
 </body>
 </html>
